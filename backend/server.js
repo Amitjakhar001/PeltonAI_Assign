@@ -24,7 +24,7 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", // Vite dev server
+    origin: "http://localhost:5173",
     methods: ["GET", "POST", "PUT", "DELETE"],
   },
 });
@@ -61,6 +61,14 @@ app.use("/uploads", express.static("uploads"));
 app.use((req, res, next) => {
   req.io = io;
   next();
+});
+
+// Health check route
+app.get("/api/health", (req, res) => {
+  res.json({
+    message: "Server is running",
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // Routes

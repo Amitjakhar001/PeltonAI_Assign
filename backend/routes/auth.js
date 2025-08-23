@@ -50,6 +50,7 @@ router.post(
         user: { id: user._id, username: user.username, email: user.email },
       });
     } catch (error) {
+      console.error("Register error:", error);
       res.status(500).json({ message: "Server error", error: error.message });
     }
   }
@@ -89,6 +90,7 @@ router.post(
         user: { id: user._id, username: user.username, email: user.email },
       });
     } catch (error) {
+      console.error("Login error:", error);
       res.status(500).json({ message: "Server error", error: error.message });
     }
   }

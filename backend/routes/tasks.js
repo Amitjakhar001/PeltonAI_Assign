@@ -64,6 +64,7 @@ router.get("/project/:projectId", authenticate, async (req, res) => {
 
     res.json(tasks);
   } catch (error) {
+    console.error("Get tasks error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });
@@ -130,6 +131,7 @@ router.post(
 
       res.status(201).json(task);
     } catch (error) {
+      console.error("Create task error:", error);
       res.status(500).json({ message: "Server error", error: error.message });
     }
   }
@@ -187,6 +189,7 @@ router.put(
 
       res.json(task);
     } catch (error) {
+      console.error("Update task error:", error);
       res.status(500).json({ message: "Server error", error: error.message });
     }
   }
@@ -236,6 +239,7 @@ router.post(
 
       res.json(task.comments[task.comments.length - 1]);
     } catch (error) {
+      console.error("Add comment error:", error);
       res.status(500).json({ message: "Server error", error: error.message });
     }
   }
@@ -260,6 +264,7 @@ router.delete("/:id", authenticate, async (req, res) => {
     await Task.findByIdAndDelete(req.params.id);
     res.json({ message: "Task deleted successfully" });
   } catch (error) {
+    console.error("Delete task error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });

@@ -2,7 +2,6 @@ import express from "express";
 import { body, validationResult } from "express-validator";
 import Project from "../models/Project.js";
 import Task from "../models/Task.js";
-import User from "../models/User.js";
 import { authenticate } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -23,6 +22,7 @@ router.get("/", authenticate, async (req, res) => {
 
     res.json(projects);
   } catch (error) {
+    console.error("Get projects error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });
@@ -71,6 +71,7 @@ router.post(
 
       res.status(201).json(project);
     } catch (error) {
+      console.error("Create project error:", error);
       res.status(500).json({ message: "Server error", error: error.message });
     }
   }
@@ -114,6 +115,7 @@ router.post(
 
       res.json({ message: "Successfully joined project", project });
     } catch (error) {
+      console.error("Join project error:", error);
       res.status(500).json({ message: "Server error", error: error.message });
     }
   }
@@ -140,6 +142,7 @@ router.get("/:id", authenticate, async (req, res) => {
 
     res.json(project);
   } catch (error) {
+    console.error("Get project details error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });
@@ -165,6 +168,7 @@ router.delete("/:id", authenticate, async (req, res) => {
     await Project.findByIdAndDelete(req.params.id);
     res.json({ message: "Project deleted successfully" });
   } catch (error) {
+    console.error("Delete project error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });
