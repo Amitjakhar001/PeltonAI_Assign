@@ -34,6 +34,8 @@ function App() {
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="project/:id" element={<ProjectDetail />} />
+              {/* Redirect /projects to /dashboard */}
+              <Route path="projects" element={<Navigate to="/dashboard" replace />} />
             </Route>
           </Routes>
         </div>
