@@ -13,6 +13,8 @@ import Register from "./pages/Register.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Projects from "./pages/Projects.jsx";
 import ProjectDetail from "./pages/ProjectDetail.jsx";
+import MyTasks from "./pages/MyTasks.jsx";
+import Notifications from "./pages/Notifications.jsx";
 
 function App() {
   return (
@@ -38,6 +40,8 @@ function App() {
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="projects" element={<Projects />} />
                 <Route path="project/:id" element={<ProjectDetail />} />
+                <Route path="my-tasks" element={<MyTasks />} />
+                <Route path="notifications" element={<Notifications />} />
               </Route>
 
               {/* Catch all route */}

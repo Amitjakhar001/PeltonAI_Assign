@@ -127,7 +127,11 @@ export const taskAPI = {
         params.append(key, filters[key]);
       }
     });
-    return api.get(`/projects/${projectId}/tasks?${params}`);
+    return api.get(`/tasks/project/${projectId}?${params}`);
+  },
+  getMyTasks: (queryString = "") => {
+    console.log("📝 Fetching my assigned tasks");
+    return api.get(`/tasks/my-tasks?${queryString}`);
   },
   create: (taskData) => {
     console.log("➕ Creating task");
@@ -152,6 +156,26 @@ export const taskAPI = {
   updateStatus: (id, status) => {
     console.log("📊 Updating task status:", id, status);
     return api.patch(`/tasks/${id}/status`, { status });
+  },
+};
+
+// Notification API
+export const notificationAPI = {
+  getAll: (queryString = "") => {
+    console.log("🔔 Fetching notifications");
+    return api.get(`/notifications?${queryString}`);
+  },
+  markAsRead: (id) => {
+    console.log("✓ Marking notification as read:", id);
+    return api.put(`/notifications/${id}/read`);
+  },
+  markAllAsRead: () => {
+    console.log("✓ Marking all notifications as read");
+    return api.put("/notifications/read-all");
+  },
+  delete: (id) => {
+    console.log("🗑️ Deleting notification:", id);
+    return api.delete(`/notifications/${id}`);
   },
 };
 
