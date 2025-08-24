@@ -1,6 +1,17 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Calendar, Users, ExternalLink, Clock, TrendingUp, BarChart3, FolderOpen, Target, Activity } from "lucide-react";
+import {
+  Plus,
+  Calendar,
+  Users,
+  ExternalLink,
+  Clock,
+  TrendingUp,
+  BarChart3,
+  FolderOpen,
+  Target,
+  Activity,
+} from "lucide-react";
 import { projectAPI } from "../services/api";
 import CreateProjectModal from "../components/CreateProjectModal";
 import JoinProjectModal from "../components/JoinProjectModal";
@@ -38,10 +49,16 @@ const Dashboard = () => {
 
   const getProjectStats = () => {
     const totalProjects = projects.length;
-    const activeProjects = projects.filter(p => new Date(p.deadline) > new Date() || !p.deadline).length;
-    const completedProjects = projects.filter(p => p.deadline && new Date(p.deadline) <= new Date()).length;
-    const totalMembers = new Set(projects.flatMap(p => p.members?.map(m => m._id) || [])).size;
-    
+    const activeProjects = projects.filter(
+      (p) => new Date(p.deadline) > new Date() || !p.deadline
+    ).length;
+    const completedProjects = projects.filter(
+      (p) => p.deadline && new Date(p.deadline) <= new Date()
+    ).length;
+    const totalMembers = new Set(
+      projects.flatMap((p) => p.members?.map((m) => m._id) || [])
+    ).size;
+
     return { totalProjects, activeProjects, completedProjects, totalMembers };
   };
 
@@ -62,61 +79,13 @@ const Dashboard = () => {
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
-      {/* Welcome Banner */}
-      <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-6 lg:p-8 text-white relative overflow-hidden shadow-lg">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-4 right-4 w-24 h-24 rounded-full bg-white opacity-20"></div>
-          <div className="absolute bottom-4 left-4 w-16 h-16 rounded-full bg-white opacity-10"></div>
-        </div>
-        
-        <div className="relative z-10">
-          <div className="flex flex-col lg:flex-row items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-white bg-opacity-20 rounded-2xl flex items-center justify-center mr-4 backdrop-blur-sm">
-                  <FolderOpen size={24} />
-                </div>
-                <div>
-                  <h1 className="text-2xl lg:text-3xl font-bold">
-                    Welcome back! 👋
-                  </h1>
-                  <p className="text-blue-100 mt-1">Ready to make progress today?</p>
-                </div>
-              </div>
-              
-              <p className="text-blue-100 leading-relaxed mb-6">
-                {projects.length > 0 
-                  ? `You have ${projects.length} project${projects.length > 1 ? 's' : ''} and ${stats.activeProjects} active project${stats.activeProjects !== 1 ? 's' : ''} that need your attention.`
-                  : 'Start your productivity journey by creating your first project or joining a team.'
-                }
-              </p>
-              
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={() => setShowCreateModal(true)}
-                  className="bg-white bg-opacity-20 hover:bg-opacity-30 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 flex items-center justify-center backdrop-blur-sm border border-white border-opacity-20"
-                >
-                  <Plus size={20} className="mr-2" />
-                  Create New Project
-                </button>
-                <button
-                  onClick={() => setShowJoinModal(true)}
-                  className="bg-white bg-opacity-10 hover:bg-opacity-20 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 flex items-center justify-center backdrop-blur-sm border border-white border-opacity-10"
-                >
-                  <ExternalLink size={20} className="mr-2" />
-                  Join Existing Project
-                </button>
-              </div>
-            </div>
-            
-            {/* Decorative Element */}
-            <div className="mt-6 lg:mt-0 lg:ml-8">
-              <div className="w-20 h-20 lg:w-24 lg:h-24 bg-white bg-opacity-10 rounded-2xl flex items-center justify-center backdrop-blur-sm transform rotate-12 hover:rotate-6 transition-transform duration-300">
-                <Target size={32} className="text-white" />
-              </div>
-            </div>
-          </div>
+      {/* Welcome Header */}
+      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 rounded-2xl text-white p-8 shadow-xl">
+        <div className="max-w-4xl">
+          <h1 className="text-3xl font-bold mb-2">Welcome back!</h1>
+          <p className="text-blue-100 text-lg">
+            Here's an overview of your projects and team collaboration
+          </p>
         </div>
       </div>
 
@@ -125,8 +94,12 @@ const Dashboard = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200 group">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 mb-1">Total Projects</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalProjects}</p>
+              <p className="text-sm font-medium text-gray-600 mb-1">
+                Total Projects
+              </p>
+              <p className="text-2xl font-bold text-gray-900">
+                {stats.totalProjects}
+              </p>
               <p className="text-xs text-gray-500 mt-1">All time</p>
             </div>
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
@@ -134,12 +107,16 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200 group">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 mb-1">Active Projects</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.activeProjects}</p>
+              <p className="text-sm font-medium text-gray-600 mb-1">
+                Active Projects
+              </p>
+              <p className="text-2xl font-bold text-gray-900">
+                {stats.activeProjects}
+              </p>
               <p className="text-xs text-green-600 mt-1">In progress</p>
             </div>
             <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
@@ -147,13 +124,17 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200 group">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 mb-1">Team Members</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalMembers}</p>
-              <p className="text-xs text-gray-500 mt-1">Collaborating</p>
+              <p className="text-sm font-medium text-gray-600 mb-1">
+                Team Members
+              </p>
+              <p className="text-2xl font-bold text-gray-900">
+                {stats.totalMembers}
+              </p>
+              <p className="text-xs text-blue-600 mt-1">Collaborating</p>
             </div>
             <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
               <Users size={24} className="text-white" />
@@ -164,12 +145,16 @@ const Dashboard = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200 group">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 mb-1">Completed</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.completedProjects}</p>
-              <p className="text-xs text-blue-600 mt-1">Finished</p>
+              <p className="text-sm font-medium text-gray-600 mb-1">
+                Completed
+              </p>
+              <p className="text-2xl font-bold text-gray-900">
+                {stats.completedProjects}
+              </p>
+              <p className="text-xs text-orange-600 mt-1">Finished</p>
             </div>
-            <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-              <TrendingUp size={24} className="text-white" />
+            <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+              <Target size={24} className="text-white" />
             </div>
           </div>
         </div>
@@ -179,8 +164,12 @@ const Dashboard = () => {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
           <div>
-            <h2 className="text-xl font-bold text-gray-900 mb-1">Your Projects</h2>
-            <p className="text-gray-600">Manage and track all your project progress in one place</p>
+            <h2 className="text-xl font-bold text-gray-900 mb-1">
+              Your Projects
+            </h2>
+            <p className="text-gray-600">
+              Manage and track all your project progress in one place
+            </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
             <button
@@ -206,10 +195,13 @@ const Dashboard = () => {
               <div className="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
                 <FolderOpen size={48} className="text-gray-400" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">No projects yet</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                No projects yet
+              </h3>
               <p className="text-gray-500 leading-relaxed mb-8">
-                Get started by creating your first project or joining an existing team. 
-                Collaborate, organize, and achieve your goals together.
+                Get started by creating your first project or joining an
+                existing team. Collaborate, organize, and achieve your goals
+                together.
               </p>
               <div className="flex flex-col sm:flex-row justify-center gap-3">
                 <button
@@ -261,12 +253,17 @@ const Dashboard = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center text-sm text-gray-500">
                       <Users size={16} className="mr-2" />
-                      <span>{project.members?.length || 0} member{project.members?.length !== 1 ? 's' : ''}</span>
+                      <span>
+                        {project.members?.length || 0} member
+                        {project.members?.length !== 1 ? "s" : ""}
+                      </span>
                     </div>
                     {project.deadline && (
                       <div className="flex items-center text-sm text-gray-500">
                         <Calendar size={16} className="mr-2" />
-                        <span>{new Date(project.deadline).toLocaleDateString()}</span>
+                        <span>
+                          {new Date(project.deadline).toLocaleDateString()}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -274,11 +271,15 @@ const Dashboard = () => {
                   {/* Project Footer */}
                   <div className="flex items-center justify-between pt-3 border-t border-gray-200">
                     <div className="text-xs text-gray-400">
-                      <span className="font-medium">Owner:</span> {project.owner?.username}
+                      <span className="font-medium">Owner:</span>{" "}
+                      {project.owner?.username}
                     </div>
                     <div className="flex items-center text-blue-600 text-sm font-medium group-hover:text-blue-700 transition-colors">
                       <span>Open</span>
-                      <ExternalLink size={14} className="ml-1 group-hover:translate-x-1 transition-transform" />
+                      <ExternalLink
+                        size={14}
+                        className="ml-1 group-hover:translate-x-1 transition-transform"
+                      />
                     </div>
                   </div>
                 </div>

@@ -1,97 +1,120 @@
-import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
-import { taskAPI } from "../services/api";
+import { useState } from "react";
+import { Plus } from "lucide-react";
 import TaskCard from "./TaskCard";
 
 const KanbanBoard = ({ tasks, project, onTaskUpdated, onTaskDeleted }) => {
+  const [draggedTask, setDraggedTask] = useState(null);
+
   const columns = [
-    { id: "To Do", title: "To Do" },
-    { id: "In Progress", title: "In Progress" },
-    { id: "Done", title: "Done" },
+    {
+      id: "To Do",
+      title: "To Do",
+      bgColor: "bg-gray-100",
+      borderColor: "border-gray-300",
+    },
+    {
+      id: "In Progress",
+      title: "In Progress",
+      bgColor: "bg-blue-100",
+      borderColor: "border-blue-300",
+    },
+    {
+      id: "Done",
+      title: "Done",
+      bgColor: "bg-green-100",
+      borderColor: "border-green-300",
+    },
   ];
 
   const getTasksByStatus = (status) => {
     return tasks.filter((task) => task.status === status);
   };
 
-  const handleDragEnd = async (result) => {
-    const { destination, source, draggableId } = result;
+  const handleDragStart = (e, task) => {
+    setDraggedTask(task);
+    e.dataTransfer.effectAllowed = "move";
+  };
 
-    if (!destination) return;
-    if (destination.droppableId === source.droppableId) return;
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
 
-    try {
-      const response = await taskAPI.update(draggableId, {
-        status: destination.droppableId,
-      });
-      onTaskUpdated(response.data);
-    } catch (error) {
-      console.error("Error updating task status:", error);
+  const handleDrop = (e, newStatus) => {
+    e.preventDefault();
+    if (draggedTask && draggedTask.status !== newStatus) {
+      const updatedTask = { ...draggedTask, status: newStatus };
+      onTaskUpdated(updatedTask);
     }
+    setDraggedTask(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedTask(null);
   };
 
   return (
-    <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {columns.map((column) => (
-          <div key={column.id} className="bg-gray-100 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-900 mb-4 text-center">
-              {column.title} ({getTasksByStatus(column.id).length})
-            </h3>
+    <div className="flex gap-6 overflow-x-auto pb-6">
+      {columns.map((column) => {
+        const columnTasks = getTasksByStatus(column.id);
 
-            <Droppable droppableId={column.id}>
-              {(provided, snapshot) => (
+        return (
+          <div
+            key={column.id}
+            className={`flex-shrink-0 w-80 ${column.bgColor} rounded-lg border-2 ${column.borderColor} p-4`}
+            onDragOver={handleDragOver}
+            onDrop={(e) => handleDrop(e, column.id)}
+          >
+            {/* Column Header */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center">
+                <h3 className="font-semibold text-gray-800">{column.title}</h3>
+                <span className="ml-2 bg-white bg-opacity-60 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">
+                  {columnTasks.length}
+                </span>
+              </div>
+            </div>
+
+            {/* Tasks */}
+            <div className="space-y-3 min-h-[200px]">
+              {columnTasks.map((task) => (
                 <div
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  className={`min-h-[200px] space-y-3 ${
-                    snapshot.isDraggingOver ? "bg-blue-50" : ""
-                  } transition-colors rounded-lg p-2`}
+                  key={task._id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, task)}
+                  onDragEnd={handleDragEnd}
+                  className={`cursor-move transition-opacity ${
+                    draggedTask && draggedTask._id === task._id
+                      ? "opacity-50"
+                      : ""
+                  }`}
                 >
-                  {getTasksByStatus(column.id).map((task, index) => (
-                    <Draggable
-                      key={task._id}
-                      draggableId={task._id}
-                      index={index}
-                    >
-                      {(provided, snapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          {...provided.dragHandleProps}
-                          className={`${
-                            snapshot.isDragging ? "rotate-2 shadow-lg" : ""
-                          } transition-all`}
-                        >
-                          <TaskCard
-                            task={task}
-                            project={project}
-                            onTaskUpdated={onTaskUpdated}
-                            onTaskDeleted={onTaskDeleted}
-                          />
-                        </div>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
+                  <TaskCard
+                    task={task}
+                    project={project}
+                    onTaskUpdated={onTaskUpdated}
+                    onTaskDeleted={onTaskDeleted}
+                  />
+                </div>
+              ))}
+
+              {/* Empty state */}
+              {columnTasks.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <div className="w-16 h-16 bg-white bg-opacity-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Plus size={24} className="text-gray-400" />
+                  </div>
+                  <p className="text-sm">
+                    No tasks in {column.title.toLowerCase()}
+                  </p>
                 </div>
               )}
-            </Droppable>
+            </div>
           </div>
-        ))}
-      </div>
-    </DragDropContext>
+        );
+      })}
+    </div>
   );
 };
 
 export default KanbanBoard;
-
-
-
-
-
-
-
-
-
-
-
