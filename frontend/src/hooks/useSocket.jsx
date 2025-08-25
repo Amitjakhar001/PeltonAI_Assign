@@ -55,7 +55,7 @@ export const SocketProvider = ({ children }) => {
     console.log("🔌 Initializing socket connection for:", user.username);
     console.log("🔑 Using token:", token.substring(0, 20) + "...");
 
-    const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || "http://localhost:5000";
+    const SOCKET_URL = "https://peltonai-taskflow.onrender.com";
     const newSocket = io(SOCKET_URL, {
       auth: {
         token: token,
