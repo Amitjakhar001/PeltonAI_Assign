@@ -126,7 +126,7 @@ const Layout = () => {
                 <FolderOpen className="h-8 w-8 text-white" />
               </div>
               <div className="ml-3">
-                <h1 className="text-lg font-semibold text-white">TaskFlow</h1>
+                <h1 className="text-lg font-semibold text-white">PeltonAI TaskFlow</h1>
               </div>
             </div>
             <button
@@ -224,7 +224,7 @@ const Layout = () => {
             >
               <Menu className="h-6 w-6" />
             </button>
-            <h1 className="text-lg font-semibold text-gray-900">TaskFlow</h1>
+            <h1 className="text-lg font-semibold text-gray-900">PeltonAI TaskFlow</h1>
             <div className="w-10" /> {/* Spacer */}
           </div>
         </div>
