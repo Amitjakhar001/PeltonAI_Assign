@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { authAPI } from "../services/api";
 
 const AuthContext = createContext();
 
@@ -36,26 +35,9 @@ export const AuthProvider = ({ children }) => {
             setToken(storedToken);
             setUser(parsedUser);
 
-            // Verify token is still valid (optional - comment out if causing issues)
-            try {
-              const response = await authAPI.getProfile();
-              console.log("✅ Token verification successful");
-              // Update user data if API returns newer info
-              if (response.data) {
-                setUser(response.data);
-                localStorage.setItem("user", JSON.stringify(response.data));
-              }
-            } catch (error) {
-              console.log(
-                "❌ Token verification failed:",
-                error.response?.status
-              );
-              if (error.response?.status === 401) {
-                console.log("🔄 Token expired, clearing auth data");
-                logout();
-              }
-              // If it's a network error, keep the user logged in
-            }
+            // Skip token verification to avoid rate limiting
+            // The token will be validated when the user makes API requests
+            console.log("✅ User session restored from localStorage");
           } catch (parseError) {
             console.error("❌ Error parsing stored user data:", parseError);
             localStorage.removeItem("token");
@@ -114,7 +96,7 @@ export const AuthProvider = ({ children }) => {
   // Don't render children until auth is initialized
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="flex flex-col items-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
           <p className="text-gray-600">Loading...</p>

@@ -36,10 +36,49 @@ const ProjectDetail = () => {
   const [notifications, setNotifications] = useState([]);
   const [onlineMembers, setOnlineMembers] = useState([]);
 
-  useEffect(() => {
-    fetchProject();
-    fetchTasks();
-  }, [id]);
+  // Utility functions
+  const showNotification = useCallback((message, type) => {
+    const notification = {
+      id: Date.now(),
+      message,
+      type,
+      timestamp: new Date(),
+    };
+
+    setNotifications((prev) => [notification, ...prev.slice(0, 4)]);
+
+    setTimeout(() => {
+      setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
+    }, 5000);
+  }, []);
+
+  const dismissNotification = useCallback((notificationId) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+  }, []);
+
+  // API functions
+  const fetchProject = async () => {
+    try {
+      const response = await projectAPI.getById(id);
+      setProject(response.data);
+    } catch (err) {
+      setError("Failed to load project");
+      navigate("/dashboard");
+    }
+  };
+
+  const fetchTasks = async () => {
+    try {
+      // Make sure to pass the id as a string, not an object
+      const queryString = new URLSearchParams(filters).toString();
+      const response = await taskAPI.getByProject(id, queryString);
+      setTasks(response.data);
+    } catch (err) {
+      console.error("Error fetching tasks:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Socket event handlers (for receiving updates from other users)
   const handleTaskUpdatedFromSocket = useCallback(
@@ -53,7 +92,7 @@ const ProjectDetail = () => {
         showNotification(`Task "${updatedTask.title}" was updated`, "update");
       }
     },
-    [user?.id]
+    [user?.id, showNotification]
   );
 
   const handleTaskCreatedFromSocket = useCallback(
@@ -65,7 +104,7 @@ const ProjectDetail = () => {
         showNotification(`New task "${newTask.title}" was created`, "create");
       }
     },
-    [user?.id]
+    [user?.id, showNotification]
   );
 
   const handleTaskDeletedFromSocket = useCallback(
@@ -77,7 +116,7 @@ const ProjectDetail = () => {
         showNotification(`Task "${taskTitle}" was deleted`, "delete");
       }
     },
-    [user?.id]
+    [user?.id, showNotification]
   );
 
   const handleCommentAdded = useCallback(
@@ -95,14 +134,17 @@ const ProjectDetail = () => {
         showNotification(`New comment on "${task.title}"`, "comment");
       }
     },
-    [user?.id]
+    [user?.id, showNotification]
   );
 
-  const handleProjectUpdated = useCallback((updatedProject) => {
-    console.log("📋 Project updated via socket:", updatedProject.name);
-    setProject(updatedProject);
-    showNotification("Project details updated", "update");
-  }, []);
+  const handleProjectUpdated = useCallback(
+    (updatedProject) => {
+      console.log("📋 Project updated via socket:", updatedProject.name);
+      setProject(updatedProject);
+      showNotification("Project details updated", "update");
+    },
+    [showNotification]
+  );
 
   const handleMemberJoined = useCallback(
     ({ member, project: updatedProject }) => {
@@ -110,7 +152,7 @@ const ProjectDetail = () => {
       setProject(updatedProject);
       showNotification(`${member.username} joined the project`, "member");
     },
-    []
+    [showNotification]
   );
 
   const handleMemberLeft = useCallback(
@@ -119,7 +161,7 @@ const ProjectDetail = () => {
       setProject(updatedProject);
       showNotification(`${member.username} left the project`, "member");
     },
-    []
+    [showNotification]
   );
 
   const handleOnlineMembers = useCallback((members) => {
@@ -131,16 +173,96 @@ const ProjectDetail = () => {
     console.log("👤 User activity:", activeUser.username, activity);
   }, []);
 
+  // Local event handlers (for user actions)
+  const handleTaskCreated = useCallback(
+    (newTask) => {
+      setTasks((prevTasks) => [newTask, ...prevTasks]);
+      setShowCreateTask(false);
+
+      // Emit to socket for real-time updates with safety check
+      if (socket && socket.connected && typeof socket.emit === "function") {
+        socket.emit("taskCreated", { projectId: id, task: newTask });
+      }
+    },
+    [socket, id]
+  );
+
+  const handleTaskUpdated = useCallback(
+    (updatedTask) => {
+      setTasks((prev) =>
+        prev.map((task) => (task._id === updatedTask._id ? updatedTask : task))
+      );
+
+      // Emit to socket for real-time updates with safety check
+      if (socket && socket.connected && typeof socket.emit === "function") {
+        socket.emit("taskUpdated", { projectId: id, task: updatedTask });
+      }
+    },
+    [socket, id]
+  );
+
+  const handleTaskDeleted = useCallback(
+    (taskId) => {
+      const task = tasks.find((t) => t._id === taskId);
+      setTasks((prev) => prev.filter((task) => task._id !== taskId));
+
+      // Emit to socket for real-time updates with safety check
+      if (
+        socket &&
+        socket.connected &&
+        typeof socket.emit === "function" &&
+        task
+      ) {
+        socket.emit("taskDeleted", {
+          projectId: id,
+          taskId,
+          taskTitle: task.title,
+        });
+      }
+    },
+    [socket, id, tasks]
+  );
+
+  // Effects
+  useEffect(() => {
+    fetchProject();
+    fetchTasks();
+  }, [id]);
+
+  useEffect(() => {
+    fetchTasks();
+  }, [filters]);
+
   // Socket connection effect
   useEffect(() => {
-    if (socket && socket.connected && project && id && !hasJoinedRoom.current) {
+    console.log("🔍 ProjectDetail socket effect triggered:", {
+      hasSocket: !!socket,
+      isConnected: socket?.connected,
+      hasEmitMethod: typeof socket?.emit === "function",
+      hasOnMethod: typeof socket?.on === "function",
+      hasOffMethod: typeof socket?.off === "function",
+      hasProject: !!project,
+      projectId: id,
+      hasJoinedRoom: hasJoinedRoom.current,
+    });
+
+    if (
+      socket &&
+      socket.connected &&
+      project &&
+      id &&
+      !hasJoinedRoom.current &&
+      typeof socket.emit === "function" &&
+      typeof socket.on === "function" &&
+      typeof socket.off === "function"
+    ) {
       console.log(`🔌 Joining project room: ${id}`);
       hasJoinedRoom.current = true;
 
       // Join project room
       socket.emit("joinProject", id);
 
-      // Set up event listeners
+      // Set up event listeners with safety checks
       socket.on("taskUpdated", handleTaskUpdatedFromSocket);
       socket.on("taskCreated", handleTaskCreatedFromSocket);
       socket.on("taskDeleted", handleTaskDeletedFromSocket);
@@ -155,21 +277,28 @@ const ProjectDetail = () => {
         console.log(`🔌 Leaving project room: ${id}`);
         hasJoinedRoom.current = false;
 
-        socket.off("taskUpdated", handleTaskUpdatedFromSocket);
-        socket.off("taskCreated", handleTaskCreatedFromSocket);
-        socket.off("taskDeleted", handleTaskDeletedFromSocket);
-        socket.off("commentAdded", handleCommentAdded);
-        socket.off("projectUpdated", handleProjectUpdated);
-        socket.off("memberJoined", handleMemberJoined);
-        socket.off("memberLeft", handleMemberLeft);
-        socket.off("onlineMembers", handleOnlineMembers);
-        socket.off("userActivity", handleUserActivity);
+        // Clean up listeners with safety checks
+        if (socket && typeof socket.off === "function") {
+          socket.off("taskUpdated", handleTaskUpdatedFromSocket);
+          socket.off("taskCreated", handleTaskCreatedFromSocket);
+          socket.off("taskDeleted", handleTaskDeletedFromSocket);
+          socket.off("commentAdded", handleCommentAdded);
+          socket.off("projectUpdated", handleProjectUpdated);
+          socket.off("memberJoined", handleMemberJoined);
+          socket.off("memberLeft", handleMemberLeft);
+          socket.off("onlineMembers", handleOnlineMembers);
+          socket.off("userActivity", handleUserActivity);
+        }
 
-        socket.emit("leaveProject", id);
+        // Leave project room with safety check
+        if (socket && typeof socket.emit === "function") {
+          socket.emit("leaveProject", id);
+        }
       };
     }
   }, [
     socket,
+    socket?.connected,
     id,
     project,
     handleTaskUpdatedFromSocket,
@@ -190,86 +319,7 @@ const ProjectDetail = () => {
     }
   }, [socket?.connected]);
 
-  const showNotification = useCallback((message, type) => {
-    const notification = {
-      id: Date.now(),
-      message,
-      type,
-      timestamp: new Date(),
-    };
-
-    setNotifications((prev) => [notification, ...prev.slice(0, 4)]);
-
-    setTimeout(() => {
-      setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
-    }, 5000);
-  }, []);
-
-  const dismissNotification = useCallback((notificationId) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
-  }, []);
-
-  const fetchProject = async () => {
-    try {
-      const response = await projectAPI.getById(id);
-      setProject(response.data);
-    } catch (err) {
-      setError("Failed to load project");
-      navigate("/dashboard");
-    }
-  };
-
-  const fetchTasks = async () => {
-    try {
-      const response = await taskAPI.getByProject(id, filters);
-      setTasks(response.data);
-    } catch (err) {
-      console.error("Error fetching tasks:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchTasks();
-  }, [filters]);
-
-  // Local event handlers (for user actions)
-  const handleTaskCreated = (newTask) => {
-    setTasks([newTask, ...tasks]);
-    setShowCreateTask(false);
-
-    // Emit to socket for real-time updates
-    if (socket && socket.connected) {
-      socket.emit("taskCreated", { projectId: id, task: newTask });
-    }
-  };
-
-  const handleTaskUpdated = (updatedTask) => {
-    setTasks((prev) =>
-      prev.map((task) => (task._id === updatedTask._id ? updatedTask : task))
-    );
-
-    // Emit to socket for real-time updates
-    if (socket && socket.connected) {
-      socket.emit("taskUpdated", { projectId: id, task: updatedTask });
-    }
-  };
-
-  const handleTaskDeleted = (taskId) => {
-    const task = tasks.find((t) => t._id === taskId);
-    setTasks((prev) => prev.filter((task) => task._id !== taskId));
-
-    // Emit to socket for real-time updates
-    if (socket && socket.connected && task) {
-      socket.emit("taskDeleted", {
-        projectId: id,
-        taskId,
-        taskTitle: task.title,
-      });
-    }
-  };
-
+  // Other handler functions
   const copyInviteCode = async () => {
     if (project?.inviteCode) {
       try {

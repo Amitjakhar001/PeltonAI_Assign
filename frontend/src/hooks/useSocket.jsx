@@ -23,6 +23,7 @@ export const SocketProvider = ({ children }) => {
   const socketRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const mountedRef = useRef(true);
+  const connectionAttempts = useRef(0);
 
   // Cleanup function
   const cleanup = useCallback(() => {
@@ -38,16 +39,21 @@ export const SocketProvider = ({ children }) => {
     }
     setSocket(null);
     setIsConnected(false);
+    connectionAttempts.current = 0;
   }, []);
 
   // Initialize socket connection
   const initializeSocket = useCallback(() => {
-    if (!user || !token || !mountedRef.current) return;
+    if (!user || !token) {
+      console.log("❌ Cannot initialize socket: missing user or token");
+      return;
+    }
 
     // Clean up existing connection
     cleanup();
 
     console.log("🔌 Initializing socket connection for:", user.username);
+    console.log("🔑 Using token:", token.substring(0, 20) + "...");
 
     const newSocket = io("http://localhost:5000", {
       auth: {
@@ -59,50 +65,70 @@ export const SocketProvider = ({ children }) => {
       reconnection: true,
       reconnectionDelay: 2000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: 3,
-      timeout: 10000,
+      reconnectionAttempts: 5,
+      timeout: 20000,
       autoConnect: true,
-      forceNew: false, // Don't force new connection unless necessary
+      forceNew: false,
     });
 
     socketRef.current = newSocket;
 
     newSocket.on("connect", () => {
-      if (!mountedRef.current) return;
       console.log("✅ Socket connected with ID:", newSocket.id);
       setSocket(newSocket);
       setIsConnected(true);
+      connectionAttempts.current = 0;
+
+      // Test the connection
+      newSocket.emit("testNotification", {
+        message: "Connection test",
+        userId: user.id,
+        username: user.username,
+      });
+    });
+
+    newSocket.on("connected", (data) => {
+      console.log("🎉 Server confirmed connection:", data);
+    });
+
+    newSocket.on("testNotificationResponse", (data) => {
+      console.log("🧪 Test notification response:", data);
     });
 
     newSocket.on("disconnect", (reason) => {
       console.log("❌ Socket disconnected:", reason);
-      if (!mountedRef.current) return;
-
       setIsConnected(false);
+      connectionAttempts.current++;
 
-      // Only set socket to null if component is still mounted
       if (reason !== "io client disconnect") {
-        // Server-side disconnect, keep socket reference for reconnection
-        console.log("🔄 Will attempt to reconnect...");
+        console.log(
+          "🔄 Will attempt to reconnect... (attempt",
+          connectionAttempts.current,
+          ")"
+        );
       } else {
-        // Client-side disconnect, clear socket
         setSocket(null);
       }
     });
 
     newSocket.on("connect_error", (error) => {
       console.error("❌ Socket connection error:", error.message);
-      if (mountedRef.current) {
-        setIsConnected(false);
-        // Don't set socket to null immediately, let reconnection handle it
+      setIsConnected(false);
+      connectionAttempts.current++;
+
+      // If authentication error, don't keep trying
+      if (error.message.includes("Authentication")) {
+        console.error("🚫 Authentication error - stopping connection attempts");
+        cleanup();
+        return;
       }
     });
 
     newSocket.on("reconnect", (attemptNumber) => {
-      if (!mountedRef.current) return;
       console.log("🔄 Socket reconnected after", attemptNumber, "attempts");
       setSocket(newSocket);
       setIsConnected(true);
+      connectionAttempts.current = 0;
     });
 
     newSocket.on("reconnect_error", (error) => {
@@ -111,15 +137,17 @@ export const SocketProvider = ({ children }) => {
 
     newSocket.on("reconnect_failed", () => {
       console.error("❌ Socket reconnection failed permanently");
-      if (mountedRef.current) {
-        setSocket(null);
-        setIsConnected(false);
-      }
+      setSocket(null);
+      setIsConnected(false);
     });
 
     // Global socket event listeners
     newSocket.on("notification", (data) => {
       console.log("🔔 Notification received:", data);
+    });
+
+    newSocket.on("newNotification", (notification) => {
+      console.log("🔔 New notification received:", notification);
     });
 
     newSocket.on("error", (error) => {
@@ -130,16 +158,12 @@ export const SocketProvider = ({ children }) => {
   // Effect to handle socket initialization
   useEffect(() => {
     if (user && token) {
-      // Delay socket connection slightly to ensure auth is stable
-      const timer = setTimeout(() => {
-        initializeSocket();
-      }, 500);
-
-      return () => {
-        clearTimeout(timer);
-      };
+      // Initialize socket immediately instead of using timer
+      console.log("🚀 Initializing socket immediately");
+      initializeSocket();
     } else {
       // User logged out, cleanup immediately
+      console.log("🧹 No user/token, cleaning up");
       cleanup();
     }
   }, [user, token, initializeSocket, cleanup]);
@@ -159,6 +183,22 @@ export const SocketProvider = ({ children }) => {
         connected: isConnected,
       }
     : null;
+
+  // Debug info
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (socket) {
+        console.log("🔍 Socket status:", {
+          connected: isConnected,
+          id: socket.id,
+          userId: user?.id,
+          username: user?.username,
+        });
+      }
+    }, 30000); // Log every 30 seconds instead of 10
+
+    return () => clearInterval(interval);
+  }, [socket, isConnected, user]);
 
   return (
     <SocketContext.Provider value={socketWithStatus}>

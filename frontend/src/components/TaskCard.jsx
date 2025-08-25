@@ -18,15 +18,25 @@ const TaskCard = ({ task, project, onTaskUpdated, onTaskDeleted }) => {
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [editData, setEditData] = useState({
-    title: task.title,
-    description: task.description || "",
-    status: task.status,
-    assignee: task.assignee?._id || "",
+    title: task?.title || "",
+    description: task?.description || "",
+    status: task?.status || "To Do",
+    assignee: task?.assignee?._id || "",
   });
 
-  const isOwner = project.owner._id === user?.id;
-  const isAssignee = task.assignee?._id === user?.id;
+  // Safe property access with fallbacks
+  const isOwner = project?.owner?._id === user?.id;
+  const isAssignee = task?.assignee?._id === user?.id;
   const canEdit = isOwner || isAssignee;
+
+  // Don't render if required props are missing
+  if (!task || !project) {
+    console.warn("TaskCard: Missing required props", {
+      task: !!task,
+      project: !!project,
+    });
+    return null;
+  }
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -44,7 +54,7 @@ const TaskCard = ({ task, project, onTaskUpdated, onTaskDeleted }) => {
   const handleStatusChange = async (newStatus) => {
     try {
       const response = await taskAPI.update(task._id, { status: newStatus });
-      onTaskUpdated(response.data);
+      onTaskUpdated?.(response.data);
     } catch (error) {
       console.error("Error updating task status:", error);
     }
@@ -53,7 +63,7 @@ const TaskCard = ({ task, project, onTaskUpdated, onTaskDeleted }) => {
   const handleSaveEdit = async () => {
     try {
       const response = await taskAPI.update(task._id, editData);
-      onTaskUpdated(response.data);
+      onTaskUpdated?.(response.data);
       setIsEditing(false);
     } catch (error) {
       console.error("Error updating task:", error);
@@ -64,7 +74,7 @@ const TaskCard = ({ task, project, onTaskUpdated, onTaskDeleted }) => {
     if (window.confirm("Are you sure you want to delete this task?")) {
       try {
         await taskAPI.delete(task._id);
-        onTaskDeleted(task._id);
+        onTaskDeleted?.(task._id);
       } catch (error) {
         console.error("Error deleting task:", error);
       }
@@ -97,7 +107,7 @@ const TaskCard = ({ task, project, onTaskUpdated, onTaskDeleted }) => {
                 onChange={(e) =>
                   setEditData({ ...editData, title: e.target.value })
                 }
-                className="input-field text-lg font-semibold"
+                className="input-field text-lg font-semibold w-full"
               />
             ) : (
               <h3 className="text-lg font-semibold text-gray-900">
@@ -138,7 +148,7 @@ const TaskCard = ({ task, project, onTaskUpdated, onTaskDeleted }) => {
               </>
             )}
 
-            {(isOwner || task.creator._id === user?.id) && (
+            {(isOwner || task?.creator?._id === user?.id) && (
               <button
                 onClick={handleDelete}
                 className="text-red-600 hover:text-red-700 p-1"
@@ -159,7 +169,7 @@ const TaskCard = ({ task, project, onTaskUpdated, onTaskDeleted }) => {
                 onChange={(e) =>
                   setEditData({ ...editData, description: e.target.value })
                 }
-                className="input-field resize-none"
+                className="input-field resize-none w-full"
                 rows={3}
                 placeholder="Task description"
               />
@@ -214,14 +224,14 @@ const TaskCard = ({ task, project, onTaskUpdated, onTaskDeleted }) => {
                 className="text-sm border border-gray-300 rounded px-2 py-1"
               >
                 <option value="">Unassigned</option>
-                {project.members?.map((member) => (
+                {project?.members?.map((member) => (
                   <option key={member._id} value={member._id}>
                     {member.username}
                   </option>
                 ))}
               </select>
             ) : (
-              <span>{task.assignee?.username || "Unassigned"}</span>
+              <span>{task?.assignee?.username || "Unassigned"}</span>
             )}
           </div>
 
@@ -234,7 +244,7 @@ const TaskCard = ({ task, project, onTaskUpdated, onTaskDeleted }) => {
           )}
 
           {/* Attachments */}
-          {task.attachments?.length > 0 && (
+          {task?.attachments?.length > 0 && (
             <div className="flex items-center gap-2">
               <Paperclip size={16} />
               <span>
@@ -243,97 +253,62 @@ const TaskCard = ({ task, project, onTaskUpdated, onTaskDeleted }) => {
               </span>
             </div>
           )}
-
-          {/* Comments */}
-          {task.comments?.length > 0 && (
-            <button
-              onClick={() => setShowComments(!showComments)}
-              className="flex items-center gap-2 hover:text-gray-700"
-            >
-              <MessageCircle size={16} />
-              <span>
-                {task.comments.length} comment
-                {task.comments.length !== 1 ? "s" : ""}
-              </span>
-            </button>
-          )}
         </div>
 
-        {/* Attachments */}
-        {task.attachments?.length > 0 && (
-          <div className="border-t pt-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">
-              Attachments
-            </h4>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {task.attachments.map((file, index) => (
-                <a
-                  key={index}
-                  href={`http://localhost:5000/uploads/${file.filename}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-blue-600 hover:text-blue-800 truncate"
-                  title={file.originalName}
-                >
-                  {file.originalName}
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Comments Section */}
-        {showComments && (
-          <div className="border-t pt-4 space-y-3">
-            <h4 className="text-sm font-medium text-gray-700">Comments</h4>
+        <div className="border-t pt-4">
+          <button
+            onClick={() => setShowComments(!showComments)}
+            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
+          >
+            <MessageCircle size={16} />
+            <span>
+              {task?.comments?.length || 0} comment
+              {task?.comments?.length !== 1 ? "s" : ""}
+            </span>
+          </button>
 
-            {/* Existing Comments */}
-            <div className="space-y-2 max-h-40 overflow-y-auto">
-              {task.comments?.map((comment, index) => (
+          {showComments && (
+            <div className="mt-4 space-y-4">
+              {/* Existing Comments */}
+              {task?.comments?.map((comment, index) => (
                 <div key={index} className="bg-gray-50 rounded-lg p-3">
-                  <div className="flex justify-between items-start mb-1">
-                    <span className="text-sm font-medium text-gray-900">
-                      {comment.author?.username}
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="font-medium text-sm text-gray-900">
+                      {comment?.author?.username || "Unknown"}
                     </span>
                     <span className="text-xs text-gray-500">
-                      {new Date(comment.createdAt).toLocaleString()}
+                      {comment?.createdAt
+                        ? new Date(comment.createdAt).toLocaleString()
+                        : ""}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-700">{comment.text}</p>
+                  <p className="text-sm text-gray-700">{comment?.text}</p>
                 </div>
               ))}
+
+              {/* Add Comment Form */}
+              <form onSubmit={handleAddComment}>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    placeholder="Add a comment..."
+                    className="flex-1 text-sm border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!newComment.trim()}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    Add
+                  </button>
+                </div>
+              </form>
             </div>
-
-            {/* Add Comment */}
-            <form onSubmit={handleAddComment} className="flex gap-2">
-              <input
-                type="text"
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Add a comment..."
-                className="input-field flex-1 text-sm"
-              />
-              <button
-                type="submit"
-                disabled={!newComment.trim()}
-                className="btn-primary text-sm px-3 py-2"
-              >
-                Add
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* Show comments button if there are comments but not shown */}
-        {task.comments?.length > 0 && !showComments && (
-          <button
-            onClick={() => setShowComments(true)}
-            className="text-sm text-blue-600 hover:text-blue-800"
-          >
-            View {task.comments.length} comment
-            {task.comments.length !== 1 ? "s" : ""}
-          </button>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

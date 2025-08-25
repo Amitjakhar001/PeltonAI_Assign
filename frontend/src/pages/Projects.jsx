@@ -53,25 +53,28 @@ const Projects = () => {
   };
 
   const filteredProjects = projects.filter((project) => {
+    // Safe string matching with null checks
     const matchesSearch =
-      project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      project.description?.toLowerCase().includes(searchTerm.toLowerCase());
+      (project.name &&
+        project.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (project.description &&
+        project.description.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesFilter =
       filterBy === "all"
         ? true
         : filterBy === "owned"
-        ? project.owner._id === user?.id
+        ? project.owner?._id === user?.id
         : filterBy === "joined"
-        ? project.owner._id !== user?.id
+        ? project.owner?._id !== user?.id
         : true;
 
     return matchesSearch && matchesFilter;
   });
 
   const getProjectStats = () => {
-    const owned = projects.filter((p) => p.owner._id === user?.id).length;
-    const joined = projects.filter((p) => p.owner._id !== user?.id).length;
+    const owned = projects.filter((p) => p.owner?._id === user?.id).length;
+    const joined = projects.filter((p) => p.owner?._id !== user?.id).length;
     const active = projects.filter(
       (p) => !p.deadline || new Date(p.deadline) > new Date()
     ).length;
@@ -280,7 +283,7 @@ const Projects = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredProjects.map((project) => {
-            const isOwner = project.owner._id === user?.id;
+            const isOwner = project.owner?._id === user?.id;
             const status = getProjectStatus(project);
 
             return (
@@ -299,7 +302,7 @@ const Projects = () => {
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors truncate">
-                            {project.name}
+                            {project.name || "Untitled Project"}
                           </h3>
                           <div className="flex items-center mt-1">
                             {isOwner ? (
@@ -357,7 +360,7 @@ const Projects = () => {
                   <div className="flex items-center justify-between pt-3 border-t border-gray-200">
                     <div className="text-xs text-gray-400">
                       <span className="font-medium">Created by:</span>{" "}
-                      {project.owner?.username}
+                      {project.owner?.username || "Unknown"}
                     </div>
                     <div className="flex items-center text-blue-600 text-sm font-medium group-hover:text-blue-700 transition-colors">
                       <span>Open</span>

@@ -11,6 +11,7 @@ import {
   FolderOpen,
   Target,
   Activity,
+  RefreshCw,
 } from "lucide-react";
 import { projectAPI } from "../services/api";
 import CreateProjectModal from "../components/CreateProjectModal";
@@ -19,6 +20,7 @@ import JoinProjectModal from "../components/JoinProjectModal";
 const Dashboard = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
 
@@ -28,10 +30,18 @@ const Dashboard = () => {
 
   const fetchProjects = async () => {
     try {
+      setLoading(true);
+      setError(null);
       const response = await projectAPI.getAll();
-      setProjects(response.data);
+      setProjects(response.data || []);
     } catch (error) {
       console.error("Error fetching projects:", error);
+      setError("Failed to load projects. Please try again.");
+
+      // If it's a rate limiting error, show a specific message
+      if (error.response?.status === 429) {
+        setError("Too many requests. Please wait a moment and try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -50,7 +60,7 @@ const Dashboard = () => {
   const getProjectStats = () => {
     const totalProjects = projects.length;
     const activeProjects = projects.filter(
-      (p) => new Date(p.deadline) > new Date() || !p.deadline
+      (p) => !p.deadline || new Date(p.deadline) > new Date()
     ).length;
     const completedProjects = projects.filter(
       (p) => p.deadline && new Date(p.deadline) <= new Date()
@@ -86,6 +96,12 @@ const Dashboard = () => {
           <p className="text-blue-100 text-lg">
             Here's an overview of your projects and team collaboration
           </p>
+
+          {error && (
+            <div className="mt-4 bg-red-500 bg-opacity-20 border border-red-300 rounded-lg p-3">
+              <p className="text-red-100 text-sm">{error}</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -160,36 +176,69 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Quick Actions */}
+      <div className="flex flex-col sm:flex-row gap-4 justify-center">
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors shadow-lg shadow-blue-600/25 flex items-center justify-center"
+        >
+          <Plus size={20} className="mr-2" />
+          Create New Project
+        </button>
+
+        <button
+          onClick={() => setShowJoinModal(true)}
+          className="bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold py-3 px-6 rounded-lg transition-colors border border-gray-200 flex items-center justify-center"
+        >
+          <ExternalLink size={20} className="mr-2" />
+          Join Project
+        </button>
+
+        <button
+          onClick={fetchProjects}
+          disabled={loading}
+          className="bg-gray-50 hover:bg-gray-100 text-gray-700 font-medium py-3 px-6 rounded-lg transition-colors border border-gray-200 flex items-center justify-center"
+        >
+          <RefreshCw
+            size={20}
+            className={`mr-2 ${loading ? "animate-spin" : ""}`}
+          />
+          Refresh
+        </button>
+      </div>
+
       {/* Projects Section */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
           <div>
             <h2 className="text-xl font-bold text-gray-900 mb-1">
-              Your Projects
+              Recent Projects
             </h2>
             <p className="text-gray-600">
-              Manage and track all your project progress in one place
+              Your latest projects and collaborations
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-            <button
-              onClick={() => setShowJoinModal(true)}
-              className="bg-gray-50 hover:bg-gray-100 text-gray-700 font-medium py-2.5 px-4 rounded-lg transition-colors border border-gray-200 flex items-center justify-center"
-            >
-              <ExternalLink size={18} className="mr-2" />
-              Join Project
-            </button>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors shadow-lg shadow-blue-600/25 flex items-center justify-center"
-            >
-              <Plus size={18} className="mr-2" />
-              New Project
-            </button>
-          </div>
+
+          <Link
+            to="/projects"
+            className="text-blue-600 hover:text-blue-700 font-medium text-sm flex items-center gap-1"
+          >
+            View All Projects
+            <ExternalLink size={16} />
+          </Link>
         </div>
 
-        {projects.length === 0 ? (
+        {error ? (
+          <div className="text-center py-12">
+            <div className="text-red-600 mb-4">
+              <p className="text-lg font-medium">Failed to load projects</p>
+              <p className="text-sm">{error}</p>
+            </div>
+            <button onClick={fetchProjects} className="btn-primary">
+              Try Again
+            </button>
+          </div>
+        ) : projects.length === 0 ? (
           <div className="text-center py-12">
             <div className="max-w-md mx-auto">
               <div className="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -223,7 +272,7 @@ const Dashboard = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {projects.map((project) => (
+            {projects.slice(0, 6).map((project) => (
               <Link
                 key={project._id}
                 to={`/project/${project._id}`}

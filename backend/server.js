@@ -31,6 +31,7 @@ const io = new Server(server, {
   cors: {
     origin: "http://localhost:5173",
     methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
   },
 });
 
@@ -41,22 +42,31 @@ const connectedUsers = new Map();
 io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth.token;
+    console.log(
+      "🔐 Socket auth attempt with token:",
+      token ? "present" : "missing"
+    );
+
     if (!token) {
+      console.log("❌ No token provided for socket auth");
       return next(new Error("Authentication error"));
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select("-password");
+    // FIX: Use decoded.userId instead of decoded.id
+    const user = await User.findById(decoded.userId).select("-password");
     if (!user) {
+      console.log("❌ User not found for socket auth");
       return next(new Error("User not found"));
     }
 
     socket.userId = user._id.toString();
     socket.username = user.username;
     socket.user = user;
+    console.log("✅ Socket authenticated for user:", user.username);
     next();
   } catch (error) {
-    console.error("Socket auth error:", error);
+    console.error("❌ Socket auth error:", error.message);
     next(new Error("Authentication error"));
   }
 });
@@ -67,7 +77,12 @@ if (!fs.existsSync("uploads")) {
 }
 
 // Security middleware
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
+
 app.use(
   cors({
     origin: "http://localhost:5173",
@@ -75,10 +90,13 @@ app.use(
   })
 );
 
-// Rate limiting
+// Much more relaxed rate limiting for development
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 1000, // Allow 1000 requests per minute per IP
+  message: "Too many requests, please try again later.",
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 app.use(limiter);
 
@@ -101,6 +119,7 @@ app.get("/api/health", (req, res) => {
     message: "Server is running",
     timestamp: new Date().toISOString(),
     connectedUsers: connectedUsers.size,
+    environment: process.env.NODE_ENV || "development",
   });
 });
 
@@ -124,11 +143,21 @@ io.on("connection", (socket) => {
 
   // Join user to their personal room for notifications
   socket.join(`user_${socket.userId}`);
+  console.log(
+    `👤 User ${socket.username} joined personal room: user_${socket.userId}`
+  );
+
+  // Send connection confirmation
+  socket.emit("connected", {
+    message: "Successfully connected to server",
+    userId: socket.userId,
+    username: socket.username,
+  });
 
   // Handle joining project rooms
   socket.on("joinProject", (projectId) => {
     socket.join(`project_${projectId}`);
-    console.log(`👥 User ${socket.username} joined project ${projectId}`);
+    console.log(`🔗 User ${socket.username} joined project ${projectId}`);
 
     // Get online members for this project
     const projectRoom = io.sockets.adapter.rooms.get(`project_${projectId}`);
@@ -145,6 +174,11 @@ io.on("connection", (socket) => {
         }
       }
 
+      console.log(
+        `👥 Project ${projectId} online members:`,
+        onlineMembers.length
+      );
+
       // Send online members to all users in the project
       io.to(`project_${projectId}`).emit("onlineMembers", onlineMembers);
     }
@@ -153,30 +187,35 @@ io.on("connection", (socket) => {
   // Handle leaving project rooms
   socket.on("leaveProject", (projectId) => {
     socket.leave(`project_${projectId}`);
-    console.log(`👤 User ${socket.username} left project ${projectId}`);
+    console.log(`👋 User ${socket.username} left project ${projectId}`);
 
     // Update online members for the project
-    const projectRoom = io.sockets.adapter.rooms.get(`project_${projectId}`);
-    const onlineMembers = [];
-    if (projectRoom) {
-      for (const socketId of projectRoom) {
-        const userSocket = io.sockets.sockets.get(socketId);
-        if (userSocket && userSocket.user) {
-          onlineMembers.push({
-            _id: userSocket.userId,
-            username: userSocket.username,
-            socketId: socketId,
-          });
+    setTimeout(() => {
+      const projectRoom = io.sockets.adapter.rooms.get(`project_${projectId}`);
+      const onlineMembers = [];
+      if (projectRoom) {
+        for (const socketId of projectRoom) {
+          const userSocket = io.sockets.sockets.get(socketId);
+          if (userSocket && userSocket.user) {
+            onlineMembers.push({
+              _id: userSocket.userId,
+              username: userSocket.username,
+              socketId: socketId,
+            });
+          }
         }
       }
-    }
 
-    // Send updated online members
-    io.to(`project_${projectId}`).emit("onlineMembers", onlineMembers);
+      // Send updated online members
+      io.to(`project_${projectId}`).emit("onlineMembers", onlineMembers);
+    }, 100);
   });
 
   // Handle user activity (typing, etc.)
   socket.on("userActivity", ({ projectId, activity }) => {
+    console.log(
+      `🎯 User activity: ${socket.username} - ${activity} in project ${projectId}`
+    );
     socket.to(`project_${projectId}`).emit("userActivity", {
       user: {
         _id: socket.userId,
@@ -188,14 +227,17 @@ io.on("connection", (socket) => {
 
   // Handle task events
   socket.on("taskCreated", ({ projectId, task }) => {
+    console.log(`📝 Task created: ${task.title} in project ${projectId}`);
     socket.to(`project_${projectId}`).emit("taskCreated", task);
   });
 
   socket.on("taskUpdated", ({ projectId, task }) => {
+    console.log(`📝 Task updated: ${task.title} in project ${projectId}`);
     socket.to(`project_${projectId}`).emit("taskUpdated", task);
   });
 
   socket.on("taskDeleted", ({ projectId, taskId, taskTitle }) => {
+    console.log(`🗑️ Task deleted: ${taskTitle} in project ${projectId}`);
     socket.to(`project_${projectId}`).emit("taskDeleted", {
       taskId,
       taskTitle,
@@ -203,32 +245,49 @@ io.on("connection", (socket) => {
     });
   });
 
+  // Test notification endpoint
+  socket.on("testNotification", (data) => {
+    console.log("🧪 Test notification received:", data);
+    socket.emit("testNotificationResponse", {
+      message: "Test notification received successfully",
+      timestamp: new Date(),
+      data,
+    });
+  });
+
   // Handle disconnect
-  socket.on("disconnect", () => {
-    console.log(`❌ User disconnected: ${socket.username} (${socket.id})`);
+  socket.on("disconnect", (reason) => {
+    console.log(
+      `❌ User disconnected: ${socket.username} (${socket.id}) - Reason: ${reason}`
+    );
     connectedUsers.delete(socket.userId);
 
     // Update online members for all projects this user was in
     socket.rooms.forEach((room) => {
       if (room.startsWith("project_")) {
-        const projectId = room.replace("project_", "");
-        const projectRoom = io.sockets.adapter.rooms.get(room);
-        const onlineMembers = [];
+        setTimeout(() => {
+          const projectRoom = io.sockets.adapter.rooms.get(room);
+          const onlineMembers = [];
 
-        if (projectRoom) {
-          for (const socketId of projectRoom) {
-            const userSocket = io.sockets.sockets.get(socketId);
-            if (userSocket && userSocket.user) {
-              onlineMembers.push({
-                _id: userSocket.userId,
-                username: userSocket.username,
-                socketId: socketId,
-              });
+          if (projectRoom) {
+            for (const socketId of projectRoom) {
+              const userSocket = io.sockets.sockets.get(socketId);
+              if (
+                userSocket &&
+                userSocket.user &&
+                userSocket.id !== socket.id
+              ) {
+                onlineMembers.push({
+                  _id: userSocket.userId,
+                  username: userSocket.username,
+                  socketId: socketId,
+                });
+              }
             }
           }
-        }
 
-        socket.to(room).emit("onlineMembers", onlineMembers);
+          socket.to(room).emit("onlineMembers", onlineMembers);
+        }, 100);
       }
     });
   });
@@ -240,9 +299,9 @@ mongoose
   .then(() => console.log("🗄️  Connected to MongoDB"))
   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
-// Error handling middleware
+// Global error handling middleware
 app.use((error, req, res, next) => {
-  console.error("❌ Error:", error);
+  console.error("❌ Server Error:", error);
   res.status(error.status || 500).json({
     message: error.message || "Internal server error",
     ...(process.env.NODE_ENV === "development" && { stack: error.stack }),
@@ -258,4 +317,5 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🌐 Socket.io server ready`);
+  console.log(`🔗 Frontend URL: http://localhost:5173`);
 });

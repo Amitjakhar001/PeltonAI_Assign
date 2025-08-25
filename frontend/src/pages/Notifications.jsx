@@ -34,14 +34,34 @@ const Notifications = () => {
   }, [filter]);
 
   useEffect(() => {
-    if (socket && socket.connected) {
+    console.log("🔍 Notifications socket effect triggered:", {
+      hasSocket: !!socket,
+      isConnected: socket?.connected,
+      hasOnMethod: typeof socket?.on === "function",
+      hasOffMethod: typeof socket?.off === "function",
+    });
+
+    if (
+      socket &&
+      socket.connected &&
+      typeof socket.on === "function" &&
+      typeof socket.off === "function"
+    ) {
+      console.log("🔌 Setting up notification listeners");
+
+      // Remove any existing listeners to prevent duplicates
+      socket.off("newNotification");
+
       socket.on("newNotification", handleNewNotification);
 
       return () => {
-        socket.off("newNotification", handleNewNotification);
+        console.log("🧹 Cleaning up notification listeners");
+        if (socket && typeof socket.off === "function") {
+          socket.off("newNotification", handleNewNotification);
+        }
       };
     }
-  }, [socket]);
+  }, [socket, socket?.connected]);
 
   const handleNewNotification = useCallback((notification) => {
     console.log("🔔 New notification received:", notification);
@@ -178,11 +198,21 @@ const Notifications = () => {
   };
 
   const getNotificationLink = (notification) => {
-    if (notification.data?.taskId) {
-      return `/project/${notification.data.projectId}`;
+    // Safe navigation with proper checks
+    if (notification?.data?.taskId && notification?.data?.projectId) {
+      // If it's a string, use it directly, if it's an object, get the _id or id
+      const projectId =
+        typeof notification.data.projectId === "string"
+          ? notification.data.projectId
+          : notification.data.projectId?._id || notification.data.projectId?.id;
+      return `/project/${projectId}`;
     }
-    if (notification.data?.projectId) {
-      return `/project/${notification.data.projectId}`;
+    if (notification?.data?.projectId) {
+      const projectId =
+        typeof notification.data.projectId === "string"
+          ? notification.data.projectId
+          : notification.data.projectId?._id || notification.data.projectId?.id;
+      return `/project/${projectId}`;
     }
     return "#";
   };
@@ -227,6 +257,19 @@ const Notifications = () => {
           <p className="text-gray-600">
             Stay updated with your projects and tasks
           </p>
+          {/* Connection Status */}
+          <div className="flex items-center gap-2 mt-2">
+            <div
+              className={`w-2 h-2 rounded-full ${
+                socket?.connected ? "bg-green-500" : "bg-red-500"
+              }`}
+            />
+            <span className="text-sm text-gray-500">
+              {socket?.connected
+                ? "Real-time notifications active"
+                : "Notifications offline"}
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
